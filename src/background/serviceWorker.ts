@@ -1,3 +1,5 @@
+//serviceWorker.ts is the background script that listens for messages from the popup and initiates the unsubscribe process in the content script.
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if(request.action === 'initiateUnsubscribe'){
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
