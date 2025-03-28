@@ -1,21 +1,32 @@
 {
   "manifest_version": 3,
-  "name": "Gmail Auto Unsubscriber",
-  "version": "1.0",
-  "description": "Automatically unsubscribe from emails with user confirmation",
+  "name": "Gmail Auto Unsubscriber Pro",
+  "version": "2.0",
+  "description": "Advanced tool for detecting and processing unsubscribe links in Gmail",
   "action": {
     "default_popup": "index.html"
-    
   },
-  "permissions": ["activeTab", "scripting", "storage"],
-  "host_permissions": ["https://mail.google.com/*"],
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "webRequest",
+    "webRequestBlocking"
+  ],
+  "host_permissions": [
+    "https://mail.google.com/*",
+    "*://*/*unsubscribe*",
+    "*://*/*optout*",
+    "*://*/*preference*"
+  ],
   "background": {
-    "service_worker": "src/background/serviceWorker.ts",
-    "type": "module"
+    "service_worker": "src/background/serviceWorker.js"
   },
-  "content_scripts": [{
-    "matches": ["https://mail.google.com/*"],
-    "js": ["src/contentScript/content.ts"],
-    "all_frames": true
-  }]
+  "content_scripts": [
+    {
+      "matches": ["https://mail.google.com/*"],
+      "js": ["src/contentScript/content.js"],
+      "run_at": "document_idle"
+    }
+  ]
 }

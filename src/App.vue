@@ -1,91 +1,94 @@
 <template>
   <div class="unsubscriber-app">
-    <h2>Gmail Auto Unsubscriber</h2>
-    <button 
-      @click="handleUnsubscribe" 
-      :disabled="processing"
-      :class="{ processing }"
-    >
-      {{ buttonText }}
-    </button>
-    <div class="status">
-      <p v-if="status">{{ status }}</p>
-      <p v-if="processedCount > 0">
-        Successfully unsubscribed from {{ processedCount }} emails!
-      </p>
-      <p v-if="error" class="error">{{ error }}</p>
-    </div>
-    <div class="options">
-      <label>
-        <input type="checkbox" v-model="autoUnsubscribe" /> Auto unsubscribe every 10 minutes
+    <h2>Gmail Unsubscriber Pro</h2>
+    <div class="control-panel">
+      <button 
+        @click="handleUnsubscribe" 
+        :disabled="processing"
+        :class="{ processing }"
+      >
+        {{ buttonText }}
+      </button>
+      
+      <label class="auto-toggle">
+        <input type="checkbox" v-model="autoUnsubscribe" />
+        Auto-scan every 10 min
       </label>
+    </div>
+    
+    <div class="status-area">
+      <div v-if="status" class="status-message">{{ status }}</div>
+      <div v-if="error" class="error-message">{{ error }}</div>
+      
+      <div v-if="processedCount > 0" class="success-message">
+        Processed {{ processedCount }} unsubscribe links
+      </div>
+      
+      <div v-if="processedUrls.length > 0" class="results">
+        <h4>Processed URLs:</h4>
+        <ul>
+          <li v-for="(url, index) in processedUrls" :key="index">
+            <a :href="url" target="_blank" rel="noopener">{{ url }}</a>
+          </li>
+        </ul>
+      </div>
     </div>
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup>
 import { ref, computed, watch, onUnmounted } from 'vue'
 
-// Reactive state variables
 const processing = ref(false)
 const status = ref('')
 const error = ref('')
 const processedCount = ref(0)
+const processedUrls = ref([])
 const autoUnsubscribe = ref(false)
-let unsubscribeInterval: NodeJS.Timeout | null = null
+let unsubscribeInterval = null
 
-// Computed property for button text
 const buttonText = computed(() => 
-  processing.value ? 'Processing...' : 'Start Unsubscribing'
+  processing.value ? 'Scanning Email...' : 'Find Unsubscribe Links'
 )
 
-// Function to handle the unsubscribe process
 const handleUnsubscribe = async () => {
   processing.value = true
-  status.value = 'Scanning emails...'
+  status.value = 'Searching for unsubscribe options...'
   error.value = ''
+  processedUrls.value = []
 
   try {
-    // Send a message to the background script to initiate the unsubscribe process
     const response = await chrome.runtime.sendMessage({
-      action: 'initiateUnsubscribe',
+      action: 'initiateUnsubscribe'
     })
 
     if (response?.success) {
       processedCount.value += response.count
-      status.value = `Successfully unsubscribed from ${response.count} emails!`
+      processedUrls.value = response.processed
+      status.value = response.count > 0
+        ? `Found ${response.count} unsubscribe links!`
+        : 'No unsubscribe links found'
     } else {
-      error.value = response?.error || 'Failed to find unsubscribe links.'
+      error.value = response?.error || 'Failed to scan email'
     }
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'An error occurred while unsubscribing.'
+    error.value = err.message || 'Extension communication error'
+    console.error('Popup error:', err)
   } finally {
     processing.value = false
   }
 }
 
-// if (autoUnsubscribe.value) {
-//   setInterval(() => {
-//     if (!processing.value) {
-//       handleUnsubscribe()
-//     }
-//   }, 10 * 60 * 1000) // 10 minutes
-// }
-
-// Watcher for auto-unsubscribe toggle
 watch(autoUnsubscribe, (newVal) => {
   if (newVal) {
-    // Start auto-unsubscribe interval
-    unsubscribeInterval = setInterval(handleUnsubscribe, 600000) // Every 10 minutes
-    handleUnsubscribe() // Run immediately when enabled
+    unsubscribeInterval = setInterval(handleUnsubscribe, 600000) // 10 min
+    handleUnsubscribe() // Run immediately
   } else if (unsubscribeInterval) {
-    // Clear interval when auto-unsubscribe is disabled
     clearInterval(unsubscribeInterval)
     unsubscribeInterval = null
   }
 })
 
-// Cleanup interval on component unmount
 onUnmounted(() => {
   if (unsubscribeInterval) {
     clearInterval(unsubscribeInterval)
@@ -95,35 +98,96 @@ onUnmounted(() => {
 
 <style scoped>
 .unsubscriber-app {
-  width: 300px;
-  padding: 20px;
-  font-family: Arial, sans-serif;
+  width: 400px;
+  padding: 16px;
+  font-family: 'Segoe UI', Roboto, sans-serif;
+}
+
+.control-panel {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
 }
 
 button {
-  padding: 10px 20px;
-  background: #4CAF50;
+  padding: 8px 16px;
+  background: #1a73e8;
   color: white;
   border: none;
   border-radius: 4px;
   cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+button:hover:not(.processing) {
+  background: #1765cc;
 }
 
 button.processing {
-  background: #808080;
-  cursor: not-allowed;
+  background: #5f6368;
+  cursor: wait;
 }
 
-.status {
-  margin-top: 15px;
-  font-size: 0.9em;
+.auto-toggle {
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.error {
-  color: #ff4444;
+.status-area {
+  margin-top: 12px;
+  font-size: 13px;
 }
 
-.options {
-  margin-top: 20px;
+.status-message {
+  color: #5f6368;
+  margin-bottom: 8px;
+}
+
+.error-message {
+  color: #d93025;
+  margin: 8px 0;
+}
+
+.success-message {
+  color: #0b8043;
+  margin: 8px 0;
+  font-weight: 500;
+}
+
+.results {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 12px;
+  border-top: 1px solid #e0e0e0;
+  padding-top: 8px;
+}
+
+.results h4 {
+  margin: 8px 0;
+  font-size: 13px;
+  color: #202124;
+}
+
+.results ul {
+  padding-left: 20px;
+  margin: 4px 0;
+}
+
+.results li {
+  margin-bottom: 4px;
+  word-break: break-all;
+}
+
+.results a {
+  color: #1a73e8;
+  text-decoration: none;
+}
+
+.results a:hover {
+  text-decoration: underline;
 }
 </style>
