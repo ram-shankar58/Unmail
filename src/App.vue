@@ -1,79 +1,94 @@
-<script setup lang="ts">
-import { handleUnsubscribe } from './lib/unsubscribeHelper';
-
-</script>
-
 <template>
   <div class="unsubscriber-app">
-    <h2>AUto unsubscriber</h2>
+    <h2>Gmail Auto Unsubscriber</h2>
     <button 
-      @click="handleUnsubscribe"
+      @click="handleUnsubscribe" 
       :disabled="processing"
-      :class="{ processing }""
-      >
-      {{  buttonText  }}
+      :class="{ processing }"
+    >
+      {{ buttonText }}
     </button>
-
     <div class="status">
-      <p v-if=""status">{{  status  }}</p>
-      <p v-if ="processedCount > 0 "> Successfully unsubscribed from  {{  processedCount  }} emails!</p>
-      <p v-if="error" class="error"> {{  error  }}</p>
-
+      <p v-if="status">{{ status }}</p>
+      <p v-if="processedCount > 0">
+        Successfully unsubscribed from {{ processedCount }} emails!
+      </p>
+      <p v-if="error" class="error">{{ error }}</p>
     </div>
-
     <div class="options">
       <label>
-        <input type="checkbox" v-model="autoUnsubscribe" > AUto unsubscribe every 10 min </label>
-        </div>
+        <input type="checkbox" v-model="autoUnsubscribe" /> Auto unsubscribe every 10 minutes
+      </label>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import  ref, computed, onMounted  from 'vue';
-const processing=ref(false)
-const status=ref('')
-const error=ref('')
-const processedCount=ref(0)
-const autoUnsubscribe=ref(false)
+import { ref, computed, watch, onUnmounted } from 'vue'
 
-const buttonText = computed(()=>
-processing.value ? 'Processing...' : 'Start Unsubscribing'
+// Reactive state variables
+const processing = ref(false)
+const status = ref('')
+const error = ref('')
+const processedCount = ref(0)
+const autoUnsubscribe = ref(false)
+let unsubscribeInterval: NodeJS.Timeout | null = null
+
+// Computed property for button text
+const buttonText = computed(() => 
+  processing.value ? 'Processing...' : 'Start Unsubscribing'
 )
 
-const handleUnsubscribe = async () =>{
-  processing.value=true
-  status.value='Scanning emails...'
+// Function to handle the unsubscribe process
+const handleUnsubscribe = async () => {
+  processing.value = true
+  status.value = 'Scanning emails...'
+  error.value = ''
 
-  try{ 
-    const response = await chrome.runtime.senddMessage({
-      action:'initaiteUnsubscribe'
+  try {
+    // Send a message to the background script to initiate the unsubscribe process
+    const response = await chrome.runtime.sendMessage({
+      action: 'initiateUnsubscribe',
     })
-    if(response?>success){
-      processedCount.value+=response.count
-      status.value=`Found ${response.count} unsubscribe targets`
+
+    if (response?.success) {
+      processedCount.value += response.count
+      status.value = `Successfully unsubscribed from ${response.count} emails!`
+    } else {
+      error.value = response?.error || 'Failed to find unsubscribe links.'
     }
-    else{ 
-      error.value=response?.error || 'No unsubscribe links found'
-    }
-  }
-  catch (err){
-    error.value= err instanceof Error ? err.message: 'Failed to unsubscribe'
-  }
-  finally{ 
-    processing.value=false
-    setTimeout(() => {
-        status.value=''
-        error.value=''
-    }, 3000);
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'An error occurred while unsubscribing.'
+  } finally {
+    processing.value = false
   }
 }
 
-//auto unsubscribing logic
+// if (autoUnsubscribe.value) {
+//   setInterval(() => {
+//     if (!processing.value) {
+//       handleUnsubscribe()
+//     }
+//   }, 10 * 60 * 1000) // 10 minutes
+// }
 
-onMounted(()=>{
-  if(autoUnsubscribe.value){
-    const interval = setInterval(handleUnsubscribe, 10*60*1000)
-    onUnmounted(()=> clearInterval(interval))
+// Watcher for auto-unsubscribe toggle
+watch(autoUnsubscribe, (newVal) => {
+  if (newVal) {
+    // Start auto-unsubscribe interval
+    unsubscribeInterval = setInterval(handleUnsubscribe, 600000) // Every 10 minutes
+    handleUnsubscribe() // Run immediately when enabled
+  } else if (unsubscribeInterval) {
+    // Clear interval when auto-unsubscribe is disabled
+    clearInterval(unsubscribeInterval)
+    unsubscribeInterval = null
+  }
+})
+
+// Cleanup interval on component unmount
+onUnmounted(() => {
+  if (unsubscribeInterval) {
+    clearInterval(unsubscribeInterval)
   }
 })
 </script>
@@ -110,6 +125,5 @@ button.processing {
 
 .options {
   margin-top: 20px;
-  font-size: 0.8em;
 }
 </style>

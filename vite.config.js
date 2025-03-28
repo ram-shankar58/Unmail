@@ -6,20 +6,11 @@ import manifest from './manifest.json'
 export default defineConfig({
   plugins: [
     vue(),
-    crx({ manifest }),
-  ],
-  build: {
-    rollupOptions: {
-      input: {
-        main: 'index.html',
-        background: 'src/background/serviceWorker.ts',
-        content: 'src/contentScript/content.ts'
+    crx({ 
+      manifest,
+      contentScripts: {
+        preambleCode: false,
       },
-      output: {
-        format: 'es',
-        entryFileNames: '[name].js',
-        chunkFileNames: 'chunks/[name]-[hash].js',
-      }
-    }
-  }
+    }),
+  ],
 })
