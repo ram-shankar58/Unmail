@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Gmail Auto Unsubscriber",
+  "version": "1.0",
+  "description": "Automatically unsubscribe from emails with user confirmation",
+  "action": {
+    "default_popup": "index.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["https://mail.google.com/*"],
+  "background": {
+    "service_worker": "src/background/serviceWorker.ts",
+    "type": "module"
+  },
+  "content_scripts": [{
+    "matches": ["https://mail.google.com/*"],
+    "js": ["src/contentScript/content.ts"],
+    "all_frames": true
+  }]
+}
